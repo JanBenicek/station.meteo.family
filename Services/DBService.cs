@@ -1,5 +1,8 @@
-﻿using Scylla.Net;
+﻿using Newtonsoft.Json;
+using Scylla.Net;
 using station.meteo.family.Models;
+using System.Globalization;
+using System.Runtime.Serialization;
 
 namespace station.meteo.family.Services
 {
@@ -42,12 +45,12 @@ namespace station.meteo.family.Services
         /// </summary>
         /// <param name="ID">Station ID</param>
         /// <param name="data">Data to Save</param>
-        public void SaveDataToDB(long ID, V1Body data)
+        public async void SaveDataToDB(long ID, V1Body data)
         {
             Scylla.Net.ISession conn = DBConnectionBuilder();
 
+            await Task.Run(() => conn.Execute($"INSERT INTO meteostation_data (mid, datetime, temp_air5, temp_air200, humidity_air, pressure_air, wind_speed, wind_direction, rain_quantity, other) VALUES ({ID}, {DateTime.ParseExact(data.DateTime, "yyyy-MM-dd_HH-mm-ss", null)}, {data.Temp5}, {data.Temp200}, {data.Humidity}, {data.Pressure}, {data.WindSpeed}, {data.WindDirection}, {data.RainQuantity}, '{JsonConvert.SerializeObject(data.Other)}')"));    //Code for Save Data to DB
 
-            //Code for Save Data to DB
         }
 
         /// <summary>
@@ -59,10 +62,16 @@ namespace station.meteo.family.Services
         {
             Scylla.Net.ISession conn = DBConnectionBuilder();
 
-
-            //Code for Acces verify by DB data
-
-            return false;
+            var rows = conn.Execute($"SELECT mid FROM meteostation WHERE mid = {ID} AND token = '{Token}'");
+            
+            if (rows!= null && rows.Count() > 0)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
 
 
