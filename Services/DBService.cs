@@ -1,8 +1,6 @@
 ﻿using Newtonsoft.Json;
 using Scylla.Net;
 using station.meteo.family.Models;
-using System.Globalization;
-using System.Runtime.Serialization;
 
 namespace station.meteo.family.Services
 {
@@ -47,10 +45,26 @@ namespace station.meteo.family.Services
         /// <param name="data">Data to Save</param>
         public async void SaveDataToDB(long ID, V1Body data)
         {
-            Scylla.Net.ISession conn = DBConnectionBuilder();
+            Scylla.Net.ISession? conn;
+            try
+            {
+                conn = DBConnectionBuilder();
+            }
+            catch (Exception ex)
+            {
+                _Logger.LogError($"Error with connecting to DB: {ex.Message}");
+                return;
+            }
 
-            await Task.Run(() => conn.Execute($"INSERT INTO meteostation_data (mid, datetime, temp_air5, temp_air200, humidity_air, pressure_air, wind_speed, wind_direction, rain_quantity, other) VALUES ({ID}, {DateTime.ParseExact(data.DateTime, "yyyy-MM-dd_HH-mm-ss", null)}, {data.Temp5}, {data.Temp200}, {data.Humidity}, {data.Pressure}, {data.WindSpeed}, {data.WindDirection}, {data.RainQuantity}, '{JsonConvert.SerializeObject(data.Other)}')"));    //Code for Save Data to DB
-
+            try
+            {
+                await Task.Run(() => conn.Execute($"INSERT INTO meteostation_data (mid, datetime, temp_air5, temp_air200, humidity_air, pressure_air, wind_speed, wind_direction, rain_quantity, other) VALUES ({ID}, {DateTime.ParseExact(data.DateTime, "yyyy-MM-dd_HH-mm-ss", null)}, {data.Temp5}, {data.Temp200}, {data.Humidity}, {data.Pressure}, {data.WindSpeed}, {data.WindDirection}, {data.RainQuantity}, '{JsonConvert.SerializeObject(data.Other)}')"));    //Code for Save Data to DB
+                _Logger.LogDebug($"Meteostation ({ID}) added data do DB");
+            }
+            catch (Exception ex)
+            {
+                _Logger.LogError($"Error when adding data to DB from Meteostation ({ID}) with message: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -60,20 +74,37 @@ namespace station.meteo.family.Services
         /// <param name="Token"></param>
         public bool StationWriteAccess(long ID, string Token)
         {
-            Scylla.Net.ISession conn = DBConnectionBuilder();
-
-            var rows = conn.Execute($"SELECT mid FROM meteostation WHERE mid = {ID} AND token = '{Token}'");
-            
-            if (rows!= null && rows.Count() > 0)
+            Scylla.Net.ISession? conn;
+            try
             {
-                return true;
+                conn = DBConnectionBuilder();
             }
-            else
+            catch (Exception ex)
             {
+                _Logger.LogError($"Error with connecting to DB: {ex.Message}");
+                return false;
+            }
+
+            try {
+                var rows = conn.Execute($"SELECT mid FROM meteostation WHERE mid = {ID} AND token = '{Token}'");
+
+                if (rows != null && rows.Count() > 0)
+                {
+                    _Logger.LogDebug($"Meteostation {ID} authentificated");
+                    return true;
+                }
+                else
+                {
+                    _Logger.LogDebug($"Meteostation {ID} is not authentificated");
+                    return false;
+                }
+            }
+            catch ( Exception ex )
+            {
+                _Logger.LogError($"Error when authentification meteostation {ID} with message: {ex.Message}");
                 return false;
             }
         }
-
 
 
 
